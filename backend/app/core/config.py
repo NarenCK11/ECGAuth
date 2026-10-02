@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql+psycopg://ecgauth:ecgauth@localhost:5432/ecgauth"
+    database_url: str = "mysql+pymysql://ecgauth:ecgauth@localhost:3306/ecgauth?charset=utf8mb4"
 
     # Auth
     jwt_secret: str = Field(min_length=32)

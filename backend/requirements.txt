@@ -13,7 +13,8 @@ pydantic>=2.7,<3
 pydantic-settings>=2.3
 email-validator>=2.1
 sqlalchemy>=2.0.30,<2.1
-psycopg[binary]>=3.2
+PyMySQL>=1.1
+cryptography>=42    # PyMySQL needs it for MySQL 8 caching_sha2_password
 alembic>=1.13
 
 # --- Security ---
