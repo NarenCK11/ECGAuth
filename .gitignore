@@ -11,3 +11,7 @@ uploads/
 .env
 *.onnx
 *.joblib
+node_modules/
+dist/
+.pytest_cache/
+*.log

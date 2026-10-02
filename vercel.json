@@ -1,7 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/", "destination": "/templates/home.html" },
-    { "source": "/demo", "destination": "/templates/demo.html" },
-    { "source": "/static/(.*)", "destination": "/static/$1" }
-  ]
-}
