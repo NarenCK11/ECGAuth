@@ -1,0 +1,128 @@
+import time
+import uuid
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.deps import client_ip, current_patient, get_ml
+from app.core.config import get_settings
+from app.core.database import get_db
+from app.models import AnalysisProfile, AuthenticationAttempt, AuthMethod, AuthResult, Role, User
+from app.schemas.ecg import AnalysisOut, AttemptDetail, AttemptSummary
+from app.services import analysis_service as an
+from app.services import authentication_service as auth_svc
+from app.services.ecg_service import ECGValidationError, parse_ecg, read_upload
+from app.services.ml_service import ECGModelService
+
+router = APIRouter(prefix="/api/ecg", tags=["ecg"])
+
+
+# --- legacy trained identities ------------------------------------------------------------------
+@router.post("/analyze")
+async def analyze_with_model(
+    request: Request,
+    username: str = Form(..., min_length=1, max_length=64),
+    hea_file: UploadFile = File(...),
+    dat_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    ml: ECGModelService = Depends(get_ml),
+):
+    """Identify an ECG against the *pre-trained model identities* (the original /identify behaviour).
+
+    This path is separate from application accounts: it never creates a session and never grants
+    access to the medical portal. The decision rule is the model's original one (see ml/inference.py).
+    """
+    started = time.perf_counter()
+    if not ml.load_model():
+        raise HTTPException(503, "The ECG model is not available.")
+    try:
+        upload = await read_upload(hea_file, dat_file, get_settings().max_upload_bytes)
+        parsed = parse_ecg(upload)
+    except ECGValidationError as e:
+        raise auth_svc.ServiceError(400, str(e))
+
+    ident = username.strip()
+    window = parsed.signal[:1500]
+    pred = ml.predict(window, ident)
+    profile = an.build_profile_data(parsed, upload.hea_hash, upload.dat_hash, ml.embedding(window))
+
+    sim = pred.similarity
+    detail = (
+        f"Closest trained identity: {pred.predicted_name}"
+        + (f"; score for '{ident}': {sim:.1%} (threshold {pred.threshold:.0%})" if sim is not None else "; claimed name not in the trained set")
+    )
+    extra = [
+        {"key": "similarity", "label": "Identity score (softmax of SVM margins)",
+         "value": None if sim is None else round(sim * 100, 2), "unit": "%", "kind": "measured"},
+        {"key": "predicted", "label": "Closest identity", "value": pred.predicted_name, "unit": "", "kind": "measured"},
+    ]
+    elapsed = max(1, int((time.perf_counter() - started) * 1000))
+    analysis = an.build_analysis_response(
+        profile, source="uploaded_file", authenticated=pred.authenticated, method=AuthMethod.ecg_model.value,
+        message="Identity verified by the ECG model." if pred.authenticated else auth_svc.GENERIC_FAILURE,
+        identity={"patient_id": None, "name": pred.predicted_name} if pred.authenticated else None,
+        identity_detail=detail, extra_metrics=extra, processing_time_ms=elapsed,
+    )
+    db.add(AuthenticationAttempt(
+        user_id=None, username_attempted=ident.lower()[:64],
+        result=(AuthResult.success if pred.authenticated else AuthResult.failure).value,
+        failure_reason=None if pred.authenticated else "model_mismatch",
+        authentication_method=AuthMethod.ecg_model.value, processing_time_ms=elapsed, ip_address=client_ip(request),
+    ))
+    auth_svc.audit(db, None, Role.patient.value, "model_identify", ip=client_ip(request), authenticated=pred.authenticated)
+    db.commit()
+    return {
+        "authenticated": pred.authenticated,
+        "predicted_name": pred.predicted_name,
+        "predicted_label": pred.predicted_label,
+        "similarity": sim,
+        "threshold": pred.threshold,
+        "claimed_name": pred.claimed_name,
+        "claimed_label": pred.claimed_label,
+        "claim_idx": pred.claim_idx,
+        "analysis": AnalysisOut(**analysis),
+    }
+
+
+# --- history for the signed-in patient ------------------------------------------------------------
+def _summary(a: AuthenticationAttempt, version: str | None, ref: str | None) -> dict:
+    return dict(
+        id=a.id, created_at=a.created_at, result=a.result, method=a.authentication_method,
+        processing_time_ms=a.processing_time_ms, pipeline_version=version, enrollment_reference=ref,
+        has_analysis=a.analysis_profile_id is not None,
+    )
+
+
+@router.get("/history", response_model=list[AttemptSummary])
+def history(user: User = Depends(current_patient), db: Session = Depends(get_db)):
+    ref = auth_svc.enrollment_reference(user.enrollment)
+    rows = db.execute(
+        select(AuthenticationAttempt, AnalysisProfile.pipeline_version)
+        .outerjoin(AnalysisProfile, AnalysisProfile.id == AuthenticationAttempt.analysis_profile_id)
+        .where(AuthenticationAttempt.user_id == user.id)
+        .order_by(AuthenticationAttempt.created_at.desc()).limit(200)
+    ).all()
+    return [_summary(a, v, ref) for a, v in rows]
+
+
+@router.get("/{attempt_id}", response_model=AttemptDetail)
+def attempt_detail(attempt_id: uuid.UUID, user: User = Depends(current_patient), db: Session = Depends(get_db)):
+    a = db.scalar(select(AuthenticationAttempt).where(
+        AuthenticationAttempt.id == attempt_id, AuthenticationAttempt.user_id == user.id))
+    if a is None:  # identical response for "missing" and "someone else's"
+        raise HTTPException(404, "Authentication event not found.")
+    ref = auth_svc.enrollment_reference(user.enrollment)
+    profile = db.get(AnalysisProfile, a.analysis_profile_id) if a.analysis_profile_id else None
+    summary = _summary(a, profile.pipeline_version if profile else None, ref)
+    if profile is None:
+        return AttemptDetail(**summary, analysis=None,
+                             note="No analysis is retained for unsuccessful attempts; uploaded recordings are never stored.")
+    analysis = an.build_analysis_response(
+        {"signal_data": profile.signal_data, "processed_signal_data": profile.processed_signal_data,
+         "feature_data": profile.feature_data, "stage_data": profile.stage_data, "display_metrics": profile.display_metrics},
+        source="enrolled_profile", authenticated=a.result == AuthResult.success.value, method=a.authentication_method,
+        message="Identity verified.", identity={"patient_id": user.patient_id, "name": user.full_name},
+        processing_time_ms=a.processing_time_ms, extra_metrics=[an.HASH_VERIFICATION_METRIC],
+    )
+    return AttemptDetail(**summary, analysis=AnalysisOut(**analysis))

@@ -25,6 +25,12 @@ PIPELINE_VERSION = "ecgauth-pipeline-1.0"
 MAX_VIEW_SECONDS = 10
 MAX_TRACE_POINTS = 1200
 
+# Shown on analyses decided by exact enrolled-file comparison (application accounts).
+HASH_VERIFICATION_METRIC = {
+    "key": "verification", "label": "Verification method",
+    "value": "Exact enrolled-file match (SHA-256)", "unit": "", "kind": "measured",
+}
+
 STAGE_DEFS = [
     # id, label, description
     ("acquisition", "Signal Acquisition", "WFDB header and signal files read and validated"),

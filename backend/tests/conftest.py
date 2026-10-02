@@ -67,7 +67,6 @@ def db(db_engine):
         for t in ("audit_logs", "authentication_attempts", "analysis_profiles", "medical_records",
                   "ecg_enrollments", "users"):
             c.execute(sa.text(f"delete from {t}"))
-        c.execute(sa.text("ALTER TABLE users AUTO_INCREMENT = 1001"))
         c.execute(sa.text("SET FOREIGN_KEY_CHECKS=1"))
     session = get_sessionmaker()()
     try:

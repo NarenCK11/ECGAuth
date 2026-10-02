@@ -30,7 +30,7 @@ def upgrade() -> None:
     op.create_index('ix_audit_logs_created', 'audit_logs', ['created_at'], unique=False)
     op.create_table('users',
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('patient_number', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('patient_number', sa.Integer(), nullable=True),
     sa.Column('username', sa.String(length=32, collation='utf8mb4_unicode_ci'), nullable=False),
     sa.Column('full_name', sa.String(length=120), nullable=False),
     sa.Column('email', sa.String(length=254, collation='utf8mb4_unicode_ci'), nullable=False),
@@ -43,11 +43,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email'),
     sa.UniqueConstraint('patient_number'),
-    sa.UniqueConstraint('username'),
-    mysql_auto_increment='1001'
+    sa.UniqueConstraint('username')
     )
-    # SQLAlchemy only emits AUTO_INCREMENT for primary keys; PT-1001, PT-1002, ... come from this column.
-    op.execute('ALTER TABLE users MODIFY patient_number INT NOT NULL AUTO_INCREMENT')
     op.create_table('ecg_enrollments',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
