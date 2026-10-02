@@ -152,6 +152,7 @@ def test_login_with_different_ecg_fails_without_session_or_leak(client, make_cli
     body = r.json()
     assert body["authenticated"] is False and body["user"] is None
     assert body["analysis"]["source"] == "uploaded_file"
+    assert body["analysis"]["features"]["source"] == "cnn_feature_extractor"
     assert body["analysis"]["authentication"]["identity"] is None
     assert [s["status"] for s in body["analysis"]["stages"]][-2:] == ["failed", "failed"]
     assert "ecgauth_session" not in c.cookies

@@ -146,6 +146,7 @@ def _recent_failures(db: Session, ident: str, ip: str | None) -> int:
 
 def authenticate_patient(
     db: Session, identifier: str, upload: UploadedECG, ip: str | None, started: float | None = None,
+    ml: ECGModelService | None = None,
 ) -> LoginOutcome:
     started = started if started is not None else time.perf_counter()
     s = get_settings()
@@ -201,7 +202,7 @@ def authenticate_patient(
             _record_attempt(db, user, ident, False, "invalid_files", None, started, ip)
             db.commit()
             raise ServiceError(400, str(e))
-        profile = an.build_profile_data(uploaded_parsed, upload.hea_hash, upload.dat_hash)
+        profile = an.build_profile_data(uploaded_parsed, upload.hea_hash, upload.dat_hash, _embedding_for(ml, uploaded_parsed))
         source = "uploaded_file"
 
     attempt = _record_attempt(db, user, ident, matched, reason, profile_row, started, ip)

@@ -59,6 +59,7 @@ async def login(
     hea_file: UploadFile = File(...),
     dat_file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    ml: ECGModelService = Depends(get_ml),
 ):
     """Authenticate with username (or patient ID) + the enrolled ECG files.
 
@@ -70,7 +71,7 @@ async def login(
         upload = await read_upload(hea_file, dat_file, get_settings().max_upload_bytes)
     except ECGValidationError as e:
         raise svc.ServiceError(400, str(e))
-    outcome = svc.authenticate_patient(db, username, upload, client_ip(request), started)
+    outcome = svc.authenticate_patient(db, username, upload, client_ip(request), started, ml)
     body = LoginResponse(
         authenticated=outcome.authenticated, message=outcome.message,
         user=UserOut.model_validate(outcome.user) if outcome.user else None,
