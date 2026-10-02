@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import client_ip, current_patient, get_ml
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.models import AnalysisProfile, AuthenticationAttempt, AuthMethod, AuthResult, Role, User
+from app.models import AnalysisProfile, AuthenticationAttempt, AuthResult, User
 from app.schemas.ecg import AnalysisOut, AttemptDetail, AttemptSummary
 from app.services import analysis_service as an
 from app.services import authentication_service as auth_svc
-from app.services.ecg_service import ECGValidationError, parse_ecg, read_upload
+from app.services.ecg_service import ECGValidationError, read_upload
 from app.services.ml_service import ECGModelService
 
 router = APIRouter(prefix="/api/ecg", tags=["ecg"])
@@ -34,56 +34,25 @@ async def analyze_with_model(
     access to the medical portal. The decision rule is the model's original one (see ml/inference.py).
     """
     started = time.perf_counter()
+    started = time.perf_counter()
     if not ml.load_model():
         raise HTTPException(503, "The ECG model is not available.")
     try:
         upload = await read_upload(hea_file, dat_file, get_settings().max_upload_bytes)
-        parsed = parse_ecg(upload)
     except ECGValidationError as e:
         raise auth_svc.ServiceError(400, str(e))
-
-    ident = username.strip()
-    window = parsed.signal[:1500]
-    pred = ml.predict(window, ident)
-    profile = an.build_profile_data(parsed, upload.hea_hash, upload.dat_hash, ml.embedding(window))
-
-    sim = pred.similarity
-    detail = (
-        f"Closest trained identity: {pred.predicted_name}"
-        + (f"; score for '{ident}': {sim:.1%} (threshold {pred.threshold:.0%})" if sim is not None else "; claimed name not in the trained set")
-    )
-    extra = [
-        {"key": "similarity", "label": "Identity score (softmax of SVM margins)",
-         "value": None if sim is None else round(sim * 100, 2), "unit": "%", "kind": "measured"},
-        {"key": "predicted", "label": "Closest identity", "value": pred.predicted_name, "unit": "", "kind": "measured"},
-    ]
-    elapsed = max(1, int((time.perf_counter() - started) * 1000))
-    analysis = an.build_analysis_response(
-        profile, source="uploaded_file", authenticated=pred.authenticated, method=AuthMethod.ecg_model.value,
-        message="Identity verified by the ECG model." if pred.authenticated else auth_svc.GENERIC_FAILURE,
-        identity={"patient_id": None, "name": pred.predicted_name} if pred.authenticated else None,
-        identity_detail=detail, extra_metrics=extra, processing_time_ms=elapsed,
-    )
-    db.add(AuthenticationAttempt(
-        user_id=None, username_attempted=ident.lower()[:64],
-        result=(AuthResult.success if pred.authenticated else AuthResult.failure).value,
-        failure_reason=None if pred.authenticated else "model_mismatch",
-        authentication_method=AuthMethod.ecg_model.value, processing_time_ms=elapsed, ip_address=client_ip(request),
-    ))
-    auth_svc.audit(db, None, Role.patient.value, "model_identify", ip=client_ip(request), authenticated=pred.authenticated)
-    db.commit()
+    pred, analysis, _ = auth_svc.identify_with_model(db, ml, username, upload, client_ip(request), started)
     return {
         "authenticated": pred.authenticated,
         "predicted_name": pred.predicted_name,
         "predicted_label": pred.predicted_label,
-        "similarity": sim,
+        "similarity": pred.similarity,
         "threshold": pred.threshold,
         "claimed_name": pred.claimed_name,
         "claimed_label": pred.claimed_label,
         "claim_idx": pred.claim_idx,
         "analysis": AnalysisOut(**analysis),
     }
-
 
 # --- history for the signed-in patient ------------------------------------------------------------
 def _summary(a: AuthenticationAttempt, version: str | None, ref: str | None) -> dict:

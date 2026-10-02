@@ -50,7 +50,9 @@ export default function AnalysisView({ analysis, animate, verdictActions }: {
           <div className="grow">
             <h2>{auth.authenticated ? "Identity Verified" : "Authentication Failed"}</h2>
             <p className="secondary">
-              {auth.authenticated && auth.identity ? `Welcome, ${auth.identity.name}` : auth.message}
+              {auth.authenticated && auth.identity
+                ? (auth.method === "ecg_model" ? `Recognized as ${auth.identity.name} by the ECG model` : `Welcome, ${auth.identity.name}`)
+                : auth.message}
             </p>
           </div>
           {verdictActions && <div className="row wrap">{verdictActions}</div>}

@@ -21,9 +21,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=201)
-def register(body: RegisterRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, request: Request, response: Response, db: Session = Depends(get_db),
+             ml: ECGModelService = Depends(get_ml)):
     """Step 1: create the account. The caller then has a short-lived enrollment session."""
-    user = svc.register_user(db, body, client_ip(request))
+    user = svc.register_user(db, body, client_ip(request), ml)
     set_session_cookie(response, ENROLL_COOKIE, user.id, TYPE_ENROLL)
     return RegisterResponse(user=UserOut.model_validate(user))
 
@@ -65,12 +66,23 @@ async def login(
 
     The decision is made here, server-side. A session cookie is issued only on success; a
     failure still returns the analysis of the *uploaded* recording, never the enrolled one.
+
+    If the name is not an application account but is one of the model's pre-trained identities
+    (e.g. Person_08), the original model analyses the recording and the same analysis experience
+    is returned - but trained identities have no account, so no session is ever issued for them.
     """
     started = time.perf_counter()
     try:
         upload = await read_upload(hea_file, dat_file, get_settings().max_upload_bytes)
     except ECGValidationError as e:
         raise svc.ServiceError(400, str(e))
+    if svc.find_user(db, username) is None and svc.model_identity_exists(ml, username):
+        pred, analysis, attempt = svc.identify_with_model(db, ml, username, upload, client_ip(request), started)
+        model_body = LoginResponse(
+            authenticated=pred.authenticated, message=analysis["authentication"]["message"],
+            user=None, attempt_id=str(attempt.id), analysis=analysis,
+        )
+        return JSONResponse(status_code=200 if pred.authenticated else 401, content=model_body.model_dump(mode="json"))
     outcome = svc.authenticate_patient(db, username, upload, client_ip(request), started, ml)
     body = LoginResponse(
         authenticated=outcome.authenticated, message=outcome.message,

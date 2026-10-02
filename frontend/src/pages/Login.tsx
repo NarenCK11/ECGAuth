@@ -56,7 +56,7 @@ export default function Login() {
       </div>
 
       <div className="auth-foot"><LockKeyhole size={15} style={{ flex: "none", marginTop: 2 }} /><span>
-        New here? <Link to="/register">Create an account</Link>. Files are checked on the server and are not stored.</span></div>
+        New here? <Link to="/register">Create an account</Link>. Pre-trained model identities (for example Person_08) are analysed by the ECG model. Files are checked on the server and are not stored.</span></div>
     </form>
   );
 }

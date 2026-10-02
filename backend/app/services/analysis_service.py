@@ -200,6 +200,11 @@ def build_analysis_response(
         s = dict(s)
         s["status"] = "completed"
         if s["id"] == "identity":
+            # What this stage really does differs by path; say so (also for profiles stored earlier).
+            s["description"] = (
+                "SVM scores the embedding against the 90 pre-trained identities" if method == "ecg_model"
+                else "Exact SHA-256 comparison of the uploaded files with the enrolled ECG files"
+            )
             s["status"] = outcome
             s["detail"] = identity_detail or (
                 "Recording matches the enrolled credential" if authenticated else "Recording does not match the enrolled credential"

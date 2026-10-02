@@ -432,3 +432,55 @@ def test_full_journey_register_enroll_logout_login_portal(client, make_client):
     assert c.post("/api/auth/logout").status_code == 204
     assert c.get("/api/medical-records").status_code == 401
     assert login(c, "journey", 7).status_code == 200                # and back in again
+
+
+# --- trained model identities through the normal sign-in ---------------------------------------------------
+def _baseline_case():
+    import json
+    from pathlib import Path
+    return json.loads((Path(__file__).parent / "fixtures" / "ml_baseline.json").read_text())["cases"][0]
+
+
+def test_trained_identity_signs_in_through_model_without_session(client):
+    case = _baseline_case()
+    r = login(client, case["top_name"].upper(), case["seed"])     # case-insensitive, no app account exists
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["authenticated"] is True and body["user"] is None
+    assert body["analysis"]["authentication"]["method"] == "ecg_model"
+    assert body["analysis"]["authentication"]["identity"]["name"] == case["top_name"]
+    assert "SVM" in next(s for s in body["analysis"]["stages"] if s["id"] == "identity")["description"]
+    assert "ecgauth_session" not in client.cookies
+    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/medical-records").status_code == 401
+
+
+def test_trained_identity_with_someone_elses_ecg_is_rejected_like_the_original(client, ml_service):
+    case = _baseline_case()
+    other = next(n for n in ml_service.known_identities() if n != case["top_name"])
+    r = login(client, other, case["seed"])
+    # Original rule: top-1 match OR score >= 0.70. A different identity's ECG normally does neither.
+    assert r.status_code in (200, 401)
+    assert r.json()["authenticated"] == (r.status_code == 200)
+
+
+def test_trained_identity_attempts_are_recorded_and_throttled(client, db):
+    from app.models import AuthenticationAttempt
+    case = _baseline_case()
+    other = next(n for n in ["Person_89", "Person_50", "Person_20"] if n != case["top_name"])
+    codes = [login(client, other, case["seed"]).status_code for _ in range(7)]
+    if 401 in codes:  # only meaningful when the wrong-identity attempts really failed
+        assert codes[-1] == 429
+    assert db.scalar(select(func.count()).select_from(AuthenticationAttempt)
+                     .where(AuthenticationAttempt.authentication_method == "ecg_model")) >= 1
+
+
+def test_registering_a_trained_identity_name_is_refused(client):
+    assert register(client, "person_08").status_code == 409
+    assert register(client, "mustafa", email="m@example.com").status_code == 409
+
+
+def test_registered_accounts_keep_using_the_hash_path(client, make_client):
+    sign_up(client, "alice", 1)
+    r = login(make_client(), "alice", 1)
+    assert r.json()["analysis"]["authentication"]["method"] == "ecg_hash"

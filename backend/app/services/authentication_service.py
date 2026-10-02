@@ -3,6 +3,9 @@
 The authentication decision is made here, on the server, and nowhere else. For application
 users the enrolled ECG files are the credential: login succeeds only if the SHA-256 digests of
 *both* uploaded files equal the enrolled digests. The ML model is not involved.
+
+The pre-trained model identities (names in user_mapping.json) have no application account; they
+are analysed by the original model (`identify_with_model`) and never receive a session.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ from app.core.security import DUMMY_HASH, digests_equal, hash_password, verify_p
 from app.models import (
     AnalysisProfile, AuditLog, AuthenticationAttempt, AuthMethod, AuthResult, ECGEnrollment, Role, User, UserStatus,
 )
+from app.ml.inference import Prediction
 from app.models.user import utcnow
 from app.schemas.auth import RegisterRequest
 from app.services import analysis_service as an
@@ -31,7 +35,7 @@ from app.services.ml_service import ECGModelService
 
 FIRST_PATIENT_NUMBER = 1001  # first patient is PT-1001
 MIN_ADMIN_PASSWORD_LENGTH = 10
-GENERIC_FAILURE ="Authentication failed. Check your username and ECG recording."
+GENERIC_FAILURE = "Authentication failed. Check your username and ECG recording."
 
 
 class ServiceError(Exception):
@@ -49,7 +53,9 @@ def enrollment_reference(e: ECGEnrollment | None) -> str | None:
 
 
 # --- registration / enrollment -----------------------------------------------------------------
-def register_user(db: Session, data: RegisterRequest, ip: str | None) -> User:
+def register_user(db: Session, data: RegisterRequest, ip: str | None, ml: ECGModelService | None = None) -> User:
+    if model_identity_exists(ml, data.username):  # keep the trained identities' names unambiguous
+        raise ServiceError(409, "That username is reserved.")
     for _ in range(5):
         # Next display number. Two simultaneous registrations can pick the same one; the unique
         # key rejects the loser, which simply retries with a fresh number.
@@ -279,3 +285,60 @@ def ensure_admin(db: Session) -> User | None:
     audit(db, None, Role.admin.value, "admin_bootstrap", username=username)
     db.commit()
     return admin
+
+
+# --- pre-trained model identities ----------------------------------------------------------------
+def model_identity_exists(ml: ECGModelService | None, identifier: str) -> bool:
+    """True if *identifier* is one of the names the existing model was trained on (case-insensitive)."""
+    if ml is None or not ml.available:
+        return False
+    key = identifier.strip().lower()
+    return any(name.strip().lower() == key for name in ml.known_identities())
+
+
+def identify_with_model(
+    db: Session, ml: ECGModelService, identifier: str, upload: UploadedECG, ip: str | None, started: float,
+) -> tuple[Prediction, dict[str, Any], AuthenticationAttempt]:
+    """Run the original, unchanged model pipeline and decision rule for a trained identity.
+
+    This never creates a session: trained identities have no application account.
+    """
+    ident = identifier.strip()
+    key = ident.lower()[:64]
+    if _recent_failures(db, key, ip) >= get_settings().login_max_failures:
+        raise ServiceError(429, "Too many failed attempts. Please wait a few minutes and try again.")
+    try:
+        parsed = parse_ecg(upload)
+    except ECGValidationError as e:
+        raise ServiceError(400, str(e))
+
+    window = parsed.signal[:1500]
+    pred = ml.predict(window, ident)
+    profile = an.build_profile_data(parsed, upload.hea_hash, upload.dat_hash, ml.embedding(window))
+    sim = pred.similarity
+    detail = f"Closest trained identity: {pred.predicted_name}" + (
+        f"; score for '{ident}': {sim:.1%} (threshold {pred.threshold:.0%})" if sim is not None
+        else "; claimed name not in the trained set")
+    extra = [
+        {"key": "similarity", "label": "Identity score (softmax of SVM margins)",
+         "value": None if sim is None else round(sim * 100, 2), "unit": "%", "kind": "measured"},
+        {"key": "predicted", "label": "Closest identity", "value": pred.predicted_name, "unit": "", "kind": "measured"},
+    ]
+    elapsed = max(1, int((time.perf_counter() - started) * 1000))
+    analysis = an.build_analysis_response(
+        profile, source="uploaded_file", authenticated=pred.authenticated, method=AuthMethod.ecg_model.value,
+        message="Identity verified by the ECG model." if pred.authenticated else GENERIC_FAILURE,
+        identity={"patient_id": None, "name": pred.predicted_name} if pred.authenticated else None,
+        identity_detail=detail, extra_metrics=extra, processing_time_ms=elapsed,
+    )
+    attempt = AuthenticationAttempt(
+        user_id=None, username_attempted=key,
+        result=(AuthResult.success if pred.authenticated else AuthResult.failure).value,
+        failure_reason=None if pred.authenticated else "model_mismatch",
+        authentication_method=AuthMethod.ecg_model.value, processing_time_ms=elapsed, ip_address=ip,
+    )
+    db.add(attempt)
+    db.flush()
+    audit(db, None, Role.patient.value, "model_identify", ip=ip, authenticated=pred.authenticated, attempt=str(attempt.id))
+    db.commit()
+    return pred, analysis, attempt

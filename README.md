@@ -94,11 +94,13 @@ Seeded authentication history is back-dated demonstration data.
 
 | | Application accounts (registered users) | Pre-trained model identities |
 |---|---|---|
-| Endpoint | `POST /api/auth/login` | `POST /api/ecg/analyze` |
+| Sign in with | Your username / `PT-…` on the normal login page → `POST /api/auth/login` | A trained name (e.g. `Person_08`, `Mustafa`; case-insensitive) on the **same** login page. `/api/auth/login` routes it to the model; `POST /api/ecg/analyze` is the direct endpoint. |
 | Decision | SHA-256 of **both** uploaded files must equal the enrolled digests (constant-time compare). The ML model is not involved. | The original CNN → RP → scaler → SVM pipeline and decision rule, unchanged. |
 | Result | Session cookie → medical portal | Analysis + decision only. **Never** creates a session or grants portal access. |
 
 The enrolled files *are* the credential, so treat them like a password file. Only their digests are stored; the raw files are discarded.
+
+Application accounts take precedence over trained names, and registering a username that equals a trained identity is refused (so the two paths never collide). Trained identities are verified and analysed exactly as before, with the same analysis screen, but they have no UUID or records, so there is deliberately no portal session for them. “Identity Analysis” (stage 6) means an exact SHA-256 file comparison for accounts and SVM scoring for trained identities; the stage text says which.
 
 **UUID identity.** Every account has a UUID primary key used for all relationships and authorization. `PT-1042` is a display label only.
 
@@ -145,7 +147,7 @@ Cookies: patients `ecgauth_session`, administrators `ecgauth_admin` (separate, `
 ## Tests
 
 ```bash
-cd backend && pytest        # 55 tests; needs TEST_DATABASE_URL (a database ending in _test)
+cd backend && pytest        # 61 tests; needs TEST_DATABASE_URL (a database ending in _test)
 cd frontend && npm run typecheck
 ```
 
