@@ -15,7 +15,6 @@
         <nav class="nav-links">
           <a href="{{ url_for('home') }}" class="{% if request.path=='/' or request.endpoint=='home' %}active{% endif %}">Home</a>
           <a href="{{ url_for('demo') }}" class="btn {% if request.endpoint=='demo' %}active{% endif %}">Demo</a>
-          <a href="{{ url_for('how_it_works') }}" class="{% if request.endpoint=='howitworks' %}active{% endif %}">How it works</a>
           <button id="themeToggle" class="btn-ghost" type="button" aria-label="Toggle theme">🌓</button>
         </nav>
       </div>

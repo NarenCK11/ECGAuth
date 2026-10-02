@@ -91,7 +91,6 @@
       const thresh = json.threshold ? ` <span class="muted small">(threshold: ${(json.threshold*100).toFixed(0)}%)</span>` : '';
       result.innerHTML = `
         <div class="result-card-large glass" style="padding:16px;border-radius:14px;">
-          <p><strong>Predicted:</strong> ${json.predicted_name} (ID ${json.predicted_label ?? '—'})</p>
           <p><strong>Similarity:</strong> ${simPct}%${thresh}</p>
           ${json.authenticated!==undefined ? `<p><strong>Authenticated:</strong> ${json.authenticated ? '✅ YES' : '❌ NO'}</p>` : ''}
         </div>`;

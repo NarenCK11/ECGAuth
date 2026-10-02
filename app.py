@@ -132,10 +132,6 @@ def home():
 def demo():
     return render_template("demo.html")
 
-@app.route("/how_it_works")
-def how_it_works():
-    return render_template("how_it_works.html")
-
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})

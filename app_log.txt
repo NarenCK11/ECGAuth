@@ -1,0 +1,55 @@
+INFO:app:Loading models & mapping...
+INFO:app:Models loaded successfully.
+INFO:app:ECGAuth backend started on http://127.0.0.1:5000
+ * Serving Flask app 'app'
+ * Debug mode: on
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.6:5000
+INFO:werkzeug:Press CTRL+C to quit
+INFO:werkzeug: * Restarting with stat
+INFO:app:Loading models & mapping...
+INFO:app:Models loaded successfully.
+INFO:app:ECGAuth backend started on http://127.0.0.1:5000
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 425-486-565
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:05] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:05] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:05] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:05] "GET /demo HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:05] "GET /how_it_works HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:10] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:28] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:29] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:29] "GET /static/js/main.js HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:29] "GET /favicon.ico HTTP/1.1" 404 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:39] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:39] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:39] "GET /static/js/main.js HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:39] "GET /favicon.ico HTTP/1.1" 404 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:43] "GET /demo HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:43] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:01:43] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:03:29] "GET /demo HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:03:29] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:03:29] "GET /static/js/main.js HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:03:29] "GET /favicon.ico HTTP/1.1" 404 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:09:17] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:09:17] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:09:17] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:09:18] "GET /demo HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:09:18] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:09:18] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:07] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:07] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:07] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:14] "GET /demo HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:14] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:14] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:25] "GET /how_it_works HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:25] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 18:13:25] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 20:24:57] "GET /demo HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 20:24:57] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [02/Oct/2026 20:24:57] "GET /static/css/style.css HTTP/1.1" 304 -
