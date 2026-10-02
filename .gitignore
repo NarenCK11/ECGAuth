@@ -18,3 +18,5 @@ dist/
 
 
 *.local.sql
+
+demo_ecg/
