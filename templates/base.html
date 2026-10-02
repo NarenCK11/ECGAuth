@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{ title | default('ECG Auth') }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  </head>
+  <body>
+    <div class="bg-blobs" aria-hidden="true"></div>
+
+    <header class="nav-wrap">
+      <div class="nav-inner">
+        <div class="brand"><a href="{{ url_for('home') }}">ECGAuth</a></div>
+        <nav class="nav-links">
+          <a href="{{ url_for('home') }}" class="{% if request.path=='/' or request.endpoint=='home' %}active{% endif %}">Home</a>
+          <a href="{{ url_for('demo') }}" class="btn {% if request.endpoint=='demo' %}active{% endif %}">Demo</a>
+          <a href="{{ url_for('how_it_works') }}" class="{% if request.endpoint=='howitworks' %}active{% endif %}">How it works</a>
+          <button id="themeToggle" class="btn-ghost" type="button" aria-label="Toggle theme">🌓</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+      <div>© {{ year }} ECGAuth — Heartbeat as your key</div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html>

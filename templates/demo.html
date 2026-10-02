@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ECG Auth - Demo</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <div class="bg-blobs" aria-hidden="true"></div>
+
+    <header class="nav-wrap">
+      <div class="nav-inner">
+        <div class="brand"><a href="/">ECGAuth</a></div>
+        <nav class="nav-links">
+          <a href="/" class="">Home</a>
+          <a href="/demo" class="btn active">Demo</a>
+          <a href="/how_it_works" class="">How it works</a>
+          <button id="themeToggle" class="btn-ghost" type="button" aria-label="Toggle theme">🌓</button>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="demo-wrap">
+        <div class="demo-grid">
+          <div class="panel glass">
+            <h2 style="margin-top:0; margin-bottom: 20px;">ECG Authentication Demo</h2>
+            
+            <form id="ecg-form" method="post" action="https://ecgauth.onrender.com/identify" enctype="multipart/form-data">
+
+              <div style="margin-bottom: 16px;">
+                <label class="text-label" for="username">Enter your username</label>
+                <input id="username" class="text-input" type="text" name="username" placeholder="e.g., John Smith" />
+              </div>
+
+              <label class="text-label">Provide your ECG files</label>
+              <div class="uploader two-col">
+                <div class="dropzone">
+                  <input type="file" id="heaFile" name="hea_file" accept=".hea" required />
+                  <div class="dz-title">Header file (.hea)</div>
+                  <span id="heaName" class="file-name">No file selected</span>
+                </div>
+                
+                <div class="dropzone">
+                  <input type="file" id="datFile" name="dat_file" accept=".dat" required />
+                  <div class="dz-title">Signal file (.dat)</div>
+                  <span id="datName" class="file-name">No file selected</span>
+                </div>
+              </div>
+
+              <div style="margin-top: 20px; display:flex; align-items: center; gap: 12px;">
+                <button type="submit" id="predictBtn" class="btn">Authenticate</button>
+                <span id="busy" class="muted" style="display:none;">Processing...</span>
+              </div>
+            </form>
+          </div>
+
+          <div class="panel glass">
+            <h3 style="margin-top:0;">Result</h3>
+            <div id="result">
+              <p class="muted">Submit your files to see the authentication result.</p>
+            </div>
+            <div class="wave-wrap">
+              <canvas id="waveCanvas"></canvas>
+              <span class="axes-label y">Amplitude (a.u.)</span>
+              <span class="axes-label x">Time (samples)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>© 2025 ECGAuth — Heartbeat as your key</div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>

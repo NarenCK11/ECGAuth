@@ -1,0 +1,212 @@
+:root{
+  --bg:#0b0d12; --ink:#e6e7eb; --muted:#9aa3b2; --accent:#5b8cff; --card:rgba(255,255,255,0.06);
+}
+:root[data-theme="light"]{
+  --bg:#f7f9fc; --ink:#111827; --muted:#6b7280; --accent:#3b82f6; --card:rgba(0,0,0,0.04);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+  background:var(--bg); color:var(--ink); margin:0; overflow-x:hidden;
+}
+
+/* decorative blobs */
+.bg-blobs{
+  position:fixed; inset:0; pointer-events:none;
+  background:
+    radial-gradient(800px 400px at 10% 10%, rgba(91,140,255,0.15), transparent 60%),
+    radial-gradient(600px 300px at 90% 20%, rgba(255,100,180,0.12), transparent 60%),
+    radial-gradient(700px 350px at 40% 80%, rgba(100,255,210,0.10), transparent 60%);
+  filter: blur(20px);
+}
+
+/* nav */
+.nav-wrap{
+  background:rgba(20,22,30,0.7); backdrop-filter: blur(10px);
+  position:sticky; top:0; z-index:40;
+  border-bottom:1px solid rgba(255,255,255,0.06)
+}
+:root[data-theme="light"] .nav-wrap{
+  background:rgba(255,255,255,0.8); border-bottom:1px solid rgba(0,0,0,0.06)
+}
+.nav-inner{
+  max-width:1200px; margin:0 auto; padding:12px 18px;
+  display:flex; align-items:center; justify-content:space-between
+}
+.brand a{font-weight:800; text-decoration:none; color:var(--ink); letter-spacing:-0.02em}
+.nav-links{display:flex; align-items:center; gap:12px}
+.nav-links a{
+  text-decoration:none; color:var(--muted);
+  padding:8px 10px; border-radius:10px; transition:background .2s,color .2s
+}
+.nav-links a:hover{background:rgba(255,255,255,0.06); color:var(--ink)}
+:root[data-theme="light"] .nav-links a:hover{background:rgba(0,0,0,0.06)}
+.nav-links a.active{background:rgba(255,255,255,0.12); color:var(--ink)}
+:root[data-theme="light"] .nav-links a.active{background:rgba(0,0,0,0.08)}
+.nav-links .btn{padding:10px 14px; border-radius:12px}
+.btn-ghost{background:transparent; border:1px solid rgba(255,255,255,0.18); padding:8px 10px; border-radius:10px; color:var(--ink)}
+:root[data-theme="light"] .btn-ghost{border-color:rgba(0,0,0,0.15)}
+
+/* hero (left aligned to avoid scrolling right) */
+.hero{padding:80px 20px 30px}
+.hero-inner{max-width:1200px; margin:0 auto; text-align:center}
+.eyebrow{color:var(--muted); text-transform:uppercase; letter-spacing:.16em; font-size:12px; margin-bottom:8px}
+.hero-title{font-size:68px; line-height:1.02; margin:0 0 10px; letter-spacing:-0.03em}
+.hero-title .accent{
+  background:linear-gradient(90deg,#7aa2ff,#c778ff 50%,#6ef1d6);
+  -webkit-background-clip:text; background-clip:text; color:transparent
+}
+.hero-desc{max-width:760px; margin:16px auto 20px; color:var(--muted)}
+.hero-cta{display:flex; gap:12px; justify-content:center}
+
+/* cards */
+.features{padding:10px 20px 40px}
+.feature-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:1200px; margin:0 auto}
+.card{padding:24px; border-radius:16px}
+.glass{background:var(--card); border:1px solid rgba(255,255,255,0.08); box-shadow:0 10px 40px rgba(0,0,0,0.25)}
+:root[data-theme="light"] .glass{border-color:rgba(0,0,0,0.08); box-shadow:0 10px 30px rgba(0,0,0,0.08)}
+
+/* demo */
+.demo-wrap{padding:30px 20px 60px}
+.demo-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:1200px; margin:0 auto}
+.panel{padding:22px; border-radius:16px}
+.uploader.two-col{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start}
+.dropzone{
+  position:relative; display:flex; flex-direction:column; align-items:flex-start;
+  justify-content:center; gap:10px; min-height:120px;
+  border:1px dashed rgba(255,255,255,0.18); border-radius:14px;
+  background:rgba(255,255,255,0.03); padding:16px
+}
+.dropzone .dz-title{font-weight:600; color:var(--ink)}
+.dropzone input{position:absolute; inset:0; opacity:0; cursor:pointer}
+.dropzone .file-name{font-size:14px; color:var(--muted)}
+.text-label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+.text-input{
+  width:100%; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.02); color:var(--ink)
+}
+:root[data-theme="light"] .text-input{background:#fff; border-color:rgba(0,0,0,0.1)}
+
+/* waveform (extra left padding prevents Y-label clipping) */
+.wave-wrap{
+  position:relative; margin-top:16px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px; padding:24px 12px 18px 48px;
+}
+.wave-wrap canvas{display:block; width:100%; height:240px}
+.axes-label{
+  position:absolute; font-size:12px; color:var(--muted);
+  pointer-events:none; user-select:none;
+}
+.axes-label.x{right:10px; bottom:6px}
+.axes-label.y{
+  left:14px; top:50%;
+  transform:translate(-50%,-50%) rotate(-90deg);
+  transform-origin:center;
+}
+
+/* utilities */
+.btn{
+  background:#111827; color:#fff; padding:12px 18px; border-radius:12px;
+  text-decoration:none; display:inline-block; border:1px solid rgba(255,255,255,0.08)
+}
+:root[data-theme="light"] .btn{background:#111827; color:#fff; border-color:rgba(0,0,0,0.15)}
+.btn:hover{filter:brightness(1.1)}
+.small{font-size:12px}
+.muted{color:var(--muted)}
+.footer{padding:24px; text-align:center; color:var(--muted); border-top:1px solid rgba(255,255,255,0.06)}
+
+/* responsive */
+@media (max-width:960px){
+  .hero-title{font-size:44px}
+  .feature-grid{grid-template-columns:1fr}
+  .demo-grid{grid-template-columns:1fr}
+}
+/* =========================
+   How it works – styled page
+   ========================= */
+
+.hiw-hero{
+  padding:70px 20px 20px;
+  position:relative;
+}
+.hiw-hero:before{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    radial-gradient(60% 50% at 20% 10%, rgba(91,140,255,.12), transparent 60%),
+    radial-gradient(60% 50% at 85% 15%, rgba(199,120,255,.10), transparent 60%);
+  filter: blur(20px); pointer-events:none;
+}
+.hiw-hero-inner{
+  max-width:1100px; margin:0 auto;
+}
+.hiw-title{
+  font-size:44px; margin:0 0 8px; letter-spacing:-.02em;
+  background:linear-gradient(90deg,#e6e7eb 40%, var(--accent));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+:root[data-theme="light"] .hiw-title{ color:inherit; -webkit-background-clip:initial; background-clip:initial; }
+
+.hiw-sub{
+  color:var(--muted); margin:0;
+}
+
+.hiw-steps{
+  max-width:1100px; margin:18px auto 80px; padding:0 20px;
+}
+
+.hiw-grid{
+  list-style:none; margin:0; padding:0;
+  display:grid; grid-template-columns:repeat(3,1fr); gap:16px;
+  counter-reset: hiw;
+  position:relative;
+}
+.hiw-grid:after{
+  /* faint diagonal connector background */
+  content:"";
+  position:absolute; inset:-20px;
+  background:
+    radial-gradient(400px 200px at 15% 30%, rgba(100,255,210,.06), transparent 60%),
+    radial-gradient(400px 200px at 85% 70%, rgba(91,140,255,.06), transparent 60%);
+  z-index:-1;
+}
+
+.hiw-card{
+  position:relative; padding:20px 18px 18px 18px; border-radius:16px;
+  min-height:140px; display:flex; flex-direction:column; gap:6px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.hiw-card:hover{ transform: translateY(-2px); box-shadow:0 18px 60px rgba(0,0,0,.28); }
+.hiw-card h3{ margin:0 0 4px; font-size:18px; }
+.hiw-card p{ margin:0; color:var(--muted); }
+.hiw-card code{ background:rgba(255,255,255,.06); padding:2px 6px; border-radius:8px }
+
+.hiw-card .num{
+  position:absolute; top:-14px; left:-14px;
+  width:36px; height:36px; border-radius:12px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:14px; color:var(--ink);
+  background:linear-gradient(135deg, rgba(91,140,255,.9), rgba(199,120,255,.9));
+  box-shadow:0 10px 20px rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.18);
+}
+
+.hiw-note{
+  margin-top:22px;
+  display:flex; align-items:center; gap:10px;
+  color:var(--muted);
+}
+.hiw-note .pill{
+  padding:6px 10px; border-radius:999px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.12);
+  font-size:12px; color:var(--ink);
+}
+
+/* responsive */
+@media (max-width:1060px){ .hiw-grid{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:680px){ .hiw-grid{ grid-template-columns:1fr; } .hiw-title{ font-size:34px; } }

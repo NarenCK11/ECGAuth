@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/templates/home.html" },
+    { "source": "/demo", "destination": "/templates/demo.html" },
+    { "source": "/how_it_works", "destination": "/templates/how_it_works.html" },
+    { "source": "/static/(.*)", "destination": "/static/$1" }
+  ]
+}

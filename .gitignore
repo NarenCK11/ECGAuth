@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+uploads/
+*.egg-info/
+.DS_Store
+.env
+*.onnx
+*.joblib
