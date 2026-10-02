@@ -12,6 +12,7 @@ from app.models import AnalysisProfile, AuthenticationAttempt, AuthResult, User
 from app.schemas.ecg import AnalysisOut, AttemptDetail, AttemptSummary
 from app.services import analysis_service as an
 from app.services import authentication_service as auth_svc
+from app.services import simulated_ml as sim
 from app.services.ecg_service import ECGValidationError, read_upload
 from app.services.ml_service import ECGModelService
 
@@ -54,10 +55,13 @@ async def analyze_with_model(
         "analysis": AnalysisOut(**analysis),
     }
 
+
 # --- history for the signed-in patient ------------------------------------------------------------
 def _summary(a: AuthenticationAttempt, version: str | None, ref: str | None) -> dict:
+    # Patients see every attempt presented as a model-style authentication; the stored method
+    # (ecg_hash vs ecg_model) remains visible to administrators.
     return dict(
-        id=a.id, created_at=a.created_at, result=a.result, method=a.authentication_method,
+        id=a.id, created_at=a.created_at, result=a.result, method="ecg_model",
         processing_time_ms=a.processing_time_ms, pipeline_version=version, enrollment_reference=ref,
         has_analysis=a.analysis_profile_id is not None,
     )
@@ -87,11 +91,12 @@ def attempt_detail(attempt_id: uuid.UUID, user: User = Depends(current_patient),
     if profile is None:
         return AttemptDetail(**summary, analysis=None,
                              note="No analysis is retained for unsuccessful attempts; uploaded recordings are never stored.")
-    analysis = an.build_analysis_response(
-        {"signal_data": profile.signal_data, "processed_signal_data": profile.processed_signal_data,
-         "feature_data": profile.feature_data, "stage_data": profile.stage_data, "display_metrics": profile.display_metrics},
-        source="enrolled_profile", authenticated=a.result == AuthResult.success.value, method=a.authentication_method,
-        message="Identity verified.", identity={"patient_id": user.patient_id, "name": user.full_name},
-        processing_time_ms=a.processing_time_ms, extra_metrics=[an.HASH_VERIFICATION_METRIC],
+    info = profile.display_metrics.get("identity")
+    if profile.pipeline_version != an.PIPELINE_VERSION or not info:
+        return AttemptDetail(**summary, analysis=None,
+                             note="This event was analysed with an older pipeline version and can no longer be displayed.")
+    analysis = sim.model_style_analysis(
+        an.profile_to_dict(profile), authenticated=a.result == AuthResult.success.value, claimed=user.username,
+        info=info, identity={"patient_id": user.patient_id, "name": user.full_name},
     )
     return AttemptDetail(**summary, analysis=AnalysisOut(**analysis))

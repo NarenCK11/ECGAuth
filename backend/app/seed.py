@@ -29,7 +29,6 @@ from app.models.user import utcnow
 from app.schemas.auth import RegisterRequest
 from app.services import authentication_service as svc
 from app.services.ecg_service import UploadedECG
-from app.services.ml_service import ECGModelService
 from app.synthetic_ecg import record_bytes
 
 log = logging.getLogger("seed")
@@ -62,7 +61,8 @@ def _history(db, user: User, profile: AnalysisProfile) -> int:
     for _ in range(int(rng.integers(8, 15))):
         when = now - timedelta(days=int(rng.integers(0, 21)), hours=int(rng.integers(0, 24)), minutes=int(rng.integers(0, 60)))
         ok = bool(rng.random() > 0.18)
-        ms = int(rng.integers(38, 96))
+        # verified attempts carry the user's seeded processing time, exactly as shown in their analysis
+        ms = int(profile.display_metrics["identity"]["processing_ms"]) if ok else int(rng.integers(96, 190))
         db.add(AuthenticationAttempt(
             user_id=user.id, username_attempted=user.username,
             result=(AuthResult.success if ok else AuthResult.failure).value,
@@ -78,14 +78,12 @@ def _history(db, user: User, profile: AnalysisProfile) -> int:
         when = now - timedelta(days=int(rng.integers(0, 14)), hours=int(rng.integers(0, 24)))
         db.add(AuthenticationAttempt(
             user_id=None, username_attempted=name, result=AuthResult.failure.value, failure_reason="unknown_user",
-            authentication_method=AuthMethod.ecg_hash.value, processing_time_ms=int(rng.integers(38, 96)),
+            authentication_method=AuthMethod.ecg_hash.value, processing_time_ms=int(rng.integers(96, 190)),
             ip_address="127.0.0.1", created_at=when))
     return n
 
 
 def seed(reset: bool = False) -> None:
-    ml = ECGModelService(get_settings().model_dir)
-    ml.load_model()  # optional: only used to compute the visualisation embedding
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
     with get_sessionmaker()() as db:
         if reset:
@@ -99,7 +97,7 @@ def seed(reset: bool = False) -> None:
                 continue
             user = svc.register_user(db, RegisterRequest(full_name=name, email=email, date_of_birth=dob, username=username), None)
             up = UploadedECG(hea, dat, f"{username}.hea", f"{username}.dat", sha256_hex(hea), sha256_hex(dat))
-            svc.enroll_user(db, user, up, ml, None)
+            svc.enroll_user(db, user, up, None)
             profile = db.scalar(select(AnalysisProfile).where(AnalysisProfile.user_id == user.id))
             _history(db, user, profile)
             db.commit()

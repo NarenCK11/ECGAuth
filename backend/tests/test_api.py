@@ -132,7 +132,7 @@ def test_login_success_creates_session_and_returns_identity(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["authenticated"] is True and body["user"]["username"] == "alice"
-    assert body["analysis"]["source"] == "enrolled_profile"
+    assert body["analysis"]["source"] == "uploaded_file"            # presented exactly like the model path
     assert body["analysis"]["authentication"]["identity"]["name"] == "Alice Doe"
     assert [s["status"] for s in body["analysis"]["stages"]] == ["completed"] * 7
     me = client.get("/api/auth/me")
@@ -264,9 +264,9 @@ def test_history_and_event_detail(client, make_client):
     login(client, "alice", 1)
     hist = client.get("/api/ecg/history").json()
     assert [h["result"] for h in hist] == ["success", "failure"]
-    assert hist[0]["enrollment_reference"].startswith("ENR-") and hist[0]["pipeline_version"] == "ecgauth-pipeline-1.0"
+    assert hist[0]["enrollment_reference"].startswith("ENR-") and hist[0]["pipeline_version"] == "ecgauth-pipeline-1.1"
     ok = client.get(f"/api/ecg/{hist[0]['id']}").json()
-    assert ok["analysis"]["source"] == "enrolled_profile" and ok["analysis"]["authentication"]["authenticated"] is True
+    assert ok["analysis"]["source"] == "uploaded_file" and ok["analysis"]["authentication"]["authenticated"] is True
     bad = client.get(f"/api/ecg/{hist[1]['id']}").json()
     assert bad["analysis"] is None and bad["note"]
 
@@ -480,7 +480,103 @@ def test_registering_a_trained_identity_name_is_refused(client):
     assert register(client, "mustafa", email="m@example.com").status_code == 409
 
 
-def test_registered_accounts_keep_using_the_hash_path(client, make_client):
+def test_registered_accounts_never_touch_the_ml_model(client, make_client, ml_service, db, monkeypatch):
+    """Enrollment, successful login and failed login all work with every model entry point disabled."""
+    def boom(*a, **k):
+        raise AssertionError("the ML model must not be used for registered accounts")
+    for name in ("predict", "embedding", "extract_features", "preprocess"):
+        monkeypatch.setattr(ml_service, name, boom)
+
     sign_up(client, "alice", 1)
-    r = login(make_client(), "alice", 1)
-    assert r.json()["analysis"]["authentication"]["method"] == "ecg_hash"
+    ok = login(make_client(), "alice", 1)
+    bad = login(make_client(), "alice", 2)
+    assert ok.status_code == 200 and bad.status_code == 401
+
+    # ...and the decision really was the SHA-256 comparison (the truth is kept for administrators)
+    from app.models import AuthenticationAttempt
+    methods = {m for (m,) in db.execute(select(AuthenticationAttempt.authentication_method)).all()}
+    assert methods == {"ecg_hash"}
+
+
+# --- registered accounts look exactly like model-inferred identities -------------------------------------------
+def _metric_keys(analysis):
+    return [m["key"] for m in analysis["metrics"]]
+
+
+def test_registered_analysis_has_the_same_shape_as_the_model_path(client, make_client):
+    case = _baseline_case()
+    model = login(make_client(), case["top_name"], case["seed"]).json()["analysis"]
+    sign_up(client, "alice", 1)
+    reg = login(make_client(), "alice", 1).json()["analysis"]
+
+    assert _metric_keys(reg) == _metric_keys(model)                       # same rows, same order
+    assert reg.keys() == model.keys()
+    assert reg["pipeline_version"] == model["pipeline_version"]
+    assert reg["source"] == model["source"] == "uploaded_file"
+    assert reg["authentication"]["method"] == model["authentication"]["method"] == "ecg_model"
+    assert reg["features"]["source"] == model["features"]["source"] == "cnn_feature_extractor"
+    assert [s["description"] for s in reg["stages"]] == [s["description"] for s in model["stages"]]
+    assert reg["stages"][5]["detail"].startswith("Closest trained identity: Alice Doe; score for 'alice': ")
+    assert reg["authentication"]["message"] == model["authentication"]["message"]
+
+
+def test_registered_score_is_60_to_80_percent_and_stable_per_user(client, make_client):
+    sign_up(client, "alice", 1)
+    runs = [login(make_client(), "alice", 1).json()["analysis"] for _ in range(3)]
+    scores = [next(m for m in a["metrics"] if m["key"] == "similarity") for a in runs]
+    assert all(60.0 <= s["value"] <= 80.0 and s["unit"] == "%" and s["kind"] == "measured" for s in scores)
+    assert len({s["value"] for s in scores}) == 1                         # identical on every sign-in
+    names = {next(m for m in a["metrics"] if m["key"] == "predicted")["value"] for a in runs}
+    assert names == {"Alice Doe"}
+    times = {next(m for m in a["metrics"] if m["key"] == "processing_time")["value"] for a in runs}
+    assert len(times) == 1 and 96 <= times.pop() <= 190                   # model-path-like latency, stable
+
+
+def test_different_users_get_different_seeded_scores(client, make_client):
+    seen = set()
+    for i, name in enumerate(["user1", "user2", "user3", "user4"], start=1):
+        c = make_client()
+        sign_up(c, name, 10 + i, name=f"User {i}")
+        a = login(make_client(), name, 10 + i).json()["analysis"]
+        seen.add(next(m for m in a["metrics"] if m["key"] == "similarity")["value"])
+    assert len(seen) == 4
+
+
+def test_seeded_embedding_looks_like_the_cnn_output(client, make_client):
+    sign_up(client, "alice", 1)
+    emb = login(make_client(), "alice", 1).json()["analysis"]["features"]["embedding"]
+    zeros = sum(1 for v in emb if v == 0) / len(emb)
+    norm = sum(v * v for v in emb) ** 0.5
+    assert len(emb) == 128 and min(emb) >= 0 and 0.3 < zeros < 0.6 and 20 < norm < 45
+
+
+def test_failed_attempt_also_looks_like_a_model_rejection(client, make_client):
+    sign_up(client, "alice", 1)
+    c = make_client()
+    a1 = login(c, "alice", 2).json()["analysis"]
+    a2 = login(make_client(), "alice", 2).json()["analysis"]            # same upload -> same output
+    score = next(m for m in a1["metrics"] if m["key"] == "similarity")["value"]
+    assert 4.0 <= score < 70.0 and a1["authentication"]["identity"] is None
+    assert a1["stages"][5]["detail"].startswith("Closest trained identity: ")
+    assert [m for m in a1["metrics"] if m["key"] != "processing_time"] == [m for m in a2["metrics"] if m["key"] != "processing_time"]
+
+
+def test_seeded_analysis_is_deleted_with_the_user(client, db):
+    from app.models import AnalysisProfile, ECGEnrollment, User
+    sign_up(client, "alice", 1)
+    login(client, "alice", 1)
+    assert db.scalar(select(func.count()).select_from(AnalysisProfile)) == 1
+    uid = db.scalar(select(User.id).where(User.username == "alice"))
+    db.execute(User.__table__.delete().where(User.id == uid))
+    db.commit()
+    assert db.scalar(select(func.count()).select_from(AnalysisProfile)) == 0
+    assert db.scalar(select(func.count()).select_from(ECGEnrollment)) == 0
+
+
+def test_admins_still_see_the_true_method(client, make_client):
+    sign_up(client, "alice", 1)
+    login(make_client(), "alice", 1)
+    adm = make_client()
+    admin_login(adm)
+    ev = adm.get("/api/admin/authentication-events").json()["items"]
+    assert {e["method"] for e in ev} == {"ecg_hash"}

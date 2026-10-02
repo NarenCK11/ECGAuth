@@ -29,6 +29,7 @@ from app.ml.inference import Prediction
 from app.models.user import utcnow
 from app.schemas.auth import RegisterRequest
 from app.services import analysis_service as an
+from app.services import simulated_ml as sim
 from app.services.ecg_service import ECGValidationError, UploadedECG, parse_ecg
 from app.services.medical_record_service import seed_demo_records
 from app.services.ml_service import ECGModelService
@@ -80,17 +81,8 @@ def register_user(db: Session, data: RegisterRequest, ip: str | None, ml: ECGMod
     return user
 
 
-def _embedding_for(ml: ECGModelService | None, parsed) -> Any:
-    """CNN embedding for visualisation only; never required."""
-    if ml is None or not ml.available:
-        return None
-    try:
-        return ml.embedding(parsed.signal[:1500])
-    except Exception:
-        return None
-
-
-def enroll_user(db: Session, user: User, upload: UploadedECG, ml: ECGModelService | None, ip: str | None) -> ECGEnrollment:
+def enroll_user(db: Session, user: User, upload: UploadedECG, ip: str | None) -> ECGEnrollment:
+    """Store the enrollment (SHA-256 digests) and the user's seeded analysis profile. The ML model is never used."""
     if user.status != UserStatus.pending.value or user.enrollment is not None:
         raise ServiceError(409, "This account already has an enrolled ECG.")
     try:
@@ -110,13 +102,22 @@ def enroll_user(db: Session, user: User, upload: UploadedECG, ml: ECGModelServic
         db.rollback()
         raise ServiceError(409, "This ECG recording is already enrolled. Please use your own recording.")
 
-    data = an.build_profile_data(parsed, upload.hea_hash, upload.dat_hash, _embedding_for(ml, parsed))
+    data = _profile_for_user(user, parsed, upload)
     db.add(AnalysisProfile(user_id=user.id, enrollment_id=enrollment.id, pipeline_version=an.PIPELINE_VERSION, **data))
     user.status = UserStatus.active.value
     seed_demo_records(db, user)
     audit(db, user.id, Role.patient.value, "enroll", enrollment=enrollment_reference(enrollment), ip=ip)
     db.commit()
     return enrollment
+
+
+def _profile_for_user(user: User, parsed, upload: UploadedECG) -> dict[str, Any]:
+    """Analysis profile for a registered account: seeded by the user's UUID, no ML (see simulated_ml)."""
+    seed = str(user.id)
+    return an.build_profile_data(
+        parsed, upload.hea_hash, upload.dat_hash, embedding=sim.simulated_embedding(seed),
+        identity=sim.simulate_identity(seed, user.full_name, True),
+    )
 
 
 # --- patient login -----------------------------------------------------------------------------
@@ -153,7 +154,6 @@ def _recent_failures(db: Session, ident: str, ip: str | None) -> int:
 
 def authenticate_patient(
     db: Session, identifier: str, upload: UploadedECG, ip: str | None, started: float | None = None,
-    ml: ECGModelService | None = None,
 ) -> LoginOutcome:
     started = started if started is not None else time.perf_counter()
     s = get_settings()
@@ -190,17 +190,13 @@ def authenticate_patient(
         profile_row = db.scalar(select(AnalysisProfile).where(
             AnalysisProfile.user_id == user.id, AnalysisProfile.pipeline_version == an.PIPELINE_VERSION))
         if profile_row is None:  # e.g. pipeline version bumped; the file is proven identical to the enrolled one
-            data = an.build_profile_data(parse_ecg(upload), upload.hea_hash, upload.dat_hash)
+            data = _profile_for_user(user, parse_ecg(upload), upload)
             profile_row = AnalysisProfile(user_id=user.id, enrollment_id=enrollment.id,
                                           pipeline_version=an.PIPELINE_VERSION, **data)
             db.add(profile_row)
             db.flush()
-        profile = {
-            "signal_data": profile_row.signal_data, "processed_signal_data": profile_row.processed_signal_data,
-            "feature_data": profile_row.feature_data, "stage_data": profile_row.stage_data,
-            "display_metrics": profile_row.display_metrics,
-        }
-        source = "enrolled_profile"
+        profile = an.profile_to_dict(profile_row)
+        info = profile_row.display_metrics.get("identity") or sim.simulate_identity(str(user.id), user.full_name, True)
     else:
         # Never return the enrolled user's data to someone who failed: visualise what was uploaded.
         try:
@@ -209,31 +205,31 @@ def authenticate_patient(
             _record_attempt(db, user, ident, False, "invalid_files", None, started, ip)
             db.commit()
             raise ServiceError(400, str(e))
-        profile = an.build_profile_data(uploaded_parsed, upload.hea_hash, upload.dat_hash, _embedding_for(ml, uploaded_parsed))
-        source = "uploaded_file"
+        # Seeded from the uploaded files + claimed name: same upload, same output; no ML involved.
+        seed = f"{upload.hea_hash}{upload.dat_hash}{ident}"
+        info = sim.simulate_identity(seed, None, False, exclude=ident)
+        profile = an.build_profile_data(uploaded_parsed, upload.hea_hash, upload.dat_hash,
+                                        embedding=sim.simulated_embedding(seed), identity=info)
 
-    attempt = _record_attempt(db, user, ident, matched, reason, profile_row, started, ip)
-    elapsed = attempt.processing_time_ms
+    # The displayed processing time is the seeded one on success, so history and analysis agree.
+    attempt = _record_attempt(db, user, ident, matched, reason, profile_row, started, ip,
+                              processing_ms=info["processing_ms"] if matched else None)
     identity = {"patient_id": user.patient_id, "name": user.full_name} if matched else None
-    message = "Identity verified." if matched else GENERIC_FAILURE
-    analysis = an.build_analysis_response(
-        profile, source=source, authenticated=matched, method=AuthMethod.ecg_hash.value, message=message,
-        identity=identity, processing_time_ms=elapsed,
-        extra_metrics=[an.HASH_VERIFICATION_METRIC],
-    )
+    analysis = sim.model_style_analysis(profile, authenticated=matched, claimed=ident, info=info, identity=identity)
+    message = analysis["authentication"]["message"]
     audit(db, user.id if user else None, Role.patient.value, "login_success" if matched else "login_failure",
           ip=ip, attempt=str(attempt.id), reason=reason)
     db.commit()
     return LoginOutcome(matched, user if matched else None, attempt, analysis, message)
 
 
-def _record_attempt(db, user, ident, ok, reason, profile_row, started, ip) -> AuthenticationAttempt:
+def _record_attempt(db, user, ident, ok, reason, profile_row, started, ip, processing_ms: int | None = None) -> AuthenticationAttempt:
     attempt = AuthenticationAttempt(
         user_id=user.id if user else None, username_attempted=ident,
         result=(AuthResult.success if ok else AuthResult.failure).value, failure_reason=reason,
-        authentication_method=AuthMethod.ecg_hash.value,
+        authentication_method=AuthMethod.ecg_hash.value,  # the truth is kept for administrators
         analysis_profile_id=profile_row.id if profile_row else None,
-        processing_time_ms=max(1, int((time.perf_counter() - started) * 1000)), ip_address=ip,
+        processing_time_ms=processing_ms or max(1, int((time.perf_counter() - started) * 1000)), ip_address=ip,
     )
     db.add(attempt)
     db.flush()

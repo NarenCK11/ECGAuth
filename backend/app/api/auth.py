@@ -37,14 +37,13 @@ async def enroll(
     dat_file: UploadFile = File(...),
     user: User = Depends(enrolling_user),
     db: Session = Depends(get_db),
-    ml: ECGModelService = Depends(get_ml),
 ):
     """Step 2: upload the .hea + .dat recording that becomes the account's credential."""
     try:
         upload = await read_upload(hea_file, dat_file, get_settings().max_upload_bytes)
     except ECGValidationError as e:
         raise svc.ServiceError(400, str(e))
-    enrollment = svc.enroll_user(db, user, upload, ml, client_ip(request))
+    enrollment = svc.enroll_user(db, user, upload, client_ip(request))
     db.refresh(user)
     clear_session_cookie(response, ENROLL_COOKIE)
     return EnrollResponse(
@@ -83,7 +82,7 @@ async def login(
             user=None, attempt_id=str(attempt.id), analysis=analysis,
         )
         return JSONResponse(status_code=200 if pred.authenticated else 401, content=model_body.model_dump(mode="json"))
-    outcome = svc.authenticate_patient(db, username, upload, client_ip(request), started, ml)
+    outcome = svc.authenticate_patient(db, username, upload, client_ip(request), started)
     body = LoginResponse(
         authenticated=outcome.authenticated, message=outcome.message,
         user=UserOut.model_validate(outcome.user) if outcome.user else None,

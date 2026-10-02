@@ -104,13 +104,15 @@ Application accounts take precedence over trained names, and registering a usern
 
 **UUID identity.** Every account has a UUID primary key used for all relationships and authorization. `PT-1042` is a display label only.
 
-**Deterministic analysis.** At enrollment the analysis profile is built once from the recording and stored (`pipeline_version = ecgauth-pipeline-1.0`); every later sign-in reuses it, so the visualization is identical each time. It is a pure function of the file bytes (no unseeded randomness, no clock).
+**Deterministic analysis.** At enrollment the analysis profile is built once and stored with the user (`pipeline_version = ecgauth-pipeline-1.1`); every later sign-in reuses it, so the visualization is identical each time. No unseeded randomness, no clock. Deleting a user deletes the profile (`ON DELETE CASCADE`).
 
-What is real and what is demonstration (the UI labels these):
+> **Simulated model output for registered accounts (demo only).** Registered accounts are authenticated **only** by the SHA-256 file comparison; the ML model is never run for them (a test disables every model entry point and signs a user in and out). To keep the demo uniform, their analysis is *styled* exactly like a model-inferred identity: an “identity score” of 60–80 %, a “closest identity” (their own name), a processing time and a 128-D embedding that mimics the CNN's output statistics. These values are drawn from a RNG **seeded by the user's UUID** (`backend/app/services/simulated_ml.py`), so they are stable per user but are **not** model results. The patient-facing screens present these sign-ins as “ECG model”; administrators still see the true method (`ecg_hash`). Do not present these numbers as real recognition accuracy.
 
-- *Measured/derived from the recording:* waveforms, baseline-corrected and z-score signals, R-peaks, heart rate, averaged beat.
-- *From the existing model:* the 128-D embedding (pre-trained CNN feature extractor).
-- *Demonstration values:* per-stage timings and their total. The “processing time” in the summary is the real server time for that request.
+What is real for every analysis (registered or trained identity):
+
+- *Computed from the recording:* waveforms, baseline-corrected and z-score signals, R-peaks, heart rate, averaged beat, sampling rate, length.
+- *Trained identities only (real model output):* the identity score, closest identity and embedding come from the pre-trained model.
+- *Demonstration values:* per-stage timings and their total (both paths).
 
 **A failed login never shows enrolled data.** On failure the analysis is built from the *uploaded* recording, so knowing a username reveals nothing about that user's ECG.
 
@@ -147,7 +149,7 @@ Cookies: patients `ecgauth_session`, administrators `ecgauth_admin` (separate, `
 ## Tests
 
 ```bash
-cd backend && pytest        # 61 tests; needs TEST_DATABASE_URL (a database ending in _test)
+cd backend && pytest        # 68 tests; needs TEST_DATABASE_URL (a database ending in _test)
 cd frontend && npm run typecheck
 ```
 

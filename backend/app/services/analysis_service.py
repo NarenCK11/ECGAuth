@@ -21,7 +21,7 @@ import numpy as np
 from app.ml import preprocessing
 from app.services.ecg_service import ParsedECG
 
-PIPELINE_VERSION = "ecgauth-pipeline-1.0"
+PIPELINE_VERSION = "ecgauth-pipeline-1.1"  # 1.1: profiles also carry the seeded identity block (see simulated_ml)
 MAX_VIEW_SECONDS = 10
 MAX_TRACE_POINTS = 1200
 
@@ -82,8 +82,22 @@ def _detect_r_peaks(x: np.ndarray, fs: float) -> np.ndarray:
     return np.array(sorted(taken), dtype=int)
 
 
-def build_profile_data(parsed: ParsedECG, hea_hash: str, dat_hash: str, embedding: np.ndarray | None = None) -> dict[str, Any]:
-    """Return {signal_data, processed_signal_data, feature_data, stage_data, display_metrics}."""
+def profile_to_dict(row: Any) -> dict[str, Any]:
+    """An AnalysisProfile row as the plain dict `build_analysis_response` consumes."""
+    return {
+        "signal_data": row.signal_data, "processed_signal_data": row.processed_signal_data,
+        "feature_data": row.feature_data, "stage_data": row.stage_data, "display_metrics": row.display_metrics,
+    }
+
+
+def build_profile_data(
+    parsed: ParsedECG, hea_hash: str, dat_hash: str, embedding: np.ndarray | None = None, identity: dict | None = None,
+) -> dict[str, Any]:
+    """Return {signal_data, processed_signal_data, feature_data, stage_data, display_metrics}.
+
+    `identity` is an optional seeded identity block (score / closest identity / processing time) kept
+    in `display_metrics["identity"]`; it is stored with the profile and never recomputed.
+    """
     fs = parsed.fs
     sig = parsed.signal
     win = preprocessing.WIN_SIZE
@@ -177,7 +191,7 @@ def build_profile_data(parsed: ParsedECG, hea_hash: str, dat_hash: str, embeddin
         "processed_signal_data": processed_signal_data,
         "feature_data": feature_data,
         "stage_data": {"stages": stages, "total_ms": total},
-        "display_metrics": {"metrics": metrics},
+        "display_metrics": {"metrics": metrics, **({"identity": identity} if identity else {})},
     }
 
 
