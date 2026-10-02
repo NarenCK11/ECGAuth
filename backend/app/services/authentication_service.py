@@ -30,6 +30,7 @@ from app.services.medical_record_service import seed_demo_records
 from app.services.ml_service import ECGModelService
 
 FIRST_PATIENT_NUMBER = 1001  # first patient is PT-1001
+MIN_ADMIN_PASSWORD_LENGTH = 10
 GENERIC_FAILURE ="Authentication failed. Check your username and ECG recording."
 
 
@@ -264,6 +265,8 @@ def ensure_admin(db: Session) -> User | None:
     s = get_settings()
     if not s.admin_username or not s.admin_password:
         return None
+    if len(s.admin_password) < MIN_ADMIN_PASSWORD_LENGTH:
+        raise RuntimeError(f"ADMIN_PASSWORD must be at least {MIN_ADMIN_PASSWORD_LENGTH} characters.")
     username = s.admin_username.strip().lower()
     existing = db.scalar(select(User).where(User.username == username))
     if existing:

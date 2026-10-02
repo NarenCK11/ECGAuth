@@ -390,3 +390,31 @@ def test_model_identify_wrong_claim_fails(client):
 
 def test_health(client):
     assert client.get("/api/health").json() == {"status": "ok", "ml_available": True}
+
+
+# --- hardening ------------------------------------------------------------------------------------------
+def test_oversized_upload_rejected_before_reading_body(client):
+    r = client.post("/api/auth/login", data={"username": "x"}, headers={"Content-Length": str(50 * 1024 * 1024)},
+                    files={"hea_file": ("a.hea", b"x", "text/plain"), "dat_file": ("a.dat", b"x", "application/octet-stream")})
+    assert r.status_code == 413
+
+
+def test_security_headers_and_no_store(client):
+    r = client.get("/api/health")
+    assert r.headers["x-content-type-options"] == "nosniff" and r.headers["x-frame-options"] == "DENY"
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_weak_bootstrap_admin_password_is_refused(db, monkeypatch):
+    from app.core import config
+    from app.services.authentication_service import ensure_admin
+
+    monkeypatch.setenv("ADMIN_USERNAME", "weakadmin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "short")
+    config.get_settings.cache_clear()
+    try:
+        with pytest.raises(RuntimeError):
+            ensure_admin(db)
+    finally:
+        monkeypatch.undo()
+        config.get_settings.cache_clear()

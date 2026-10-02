@@ -40,6 +40,27 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type"],
     )
 
+    upload_paths = {"/api/auth/login", "/api/auth/enroll", "/api/ecg/analyze"}
+    body_limit = settings.max_upload_bytes * 2 + 64 * 1024  # two files plus multipart overhead
+
+    @app.middleware("http")
+    async def guard_and_harden(request: Request, call_next):
+        # Reject oversized uploads from the declared length before the body is read.
+        if request.method == "POST" and request.url.path in upload_paths:
+            try:
+                declared = int(request.headers.get("content-length", "0"))
+            except ValueError:
+                declared = 0
+            if declared > body_limit:
+                return JSONResponse(status_code=413, content={"detail": "Upload is too large."})
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        if request.url.path.startswith("/api/"):
+            response.headers.setdefault("Cache-Control", "no-store")  # never cache authenticated data
+        return response
+
     @app.exception_handler(ServiceError)
     async def _service_error(_: Request, exc: ServiceError):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

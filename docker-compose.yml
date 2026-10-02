@@ -1,0 +1,50 @@
+# ECGAuth: MySQL + FastAPI + React (nginx).   Usage: cp .env.example .env  (fill it in)  &&  docker compose up --build
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecgauth}
+      MYSQL_USER: ${MYSQL_USER:-ecgauth}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Use URL-safe characters in MYSQL_PASSWORD (letters and digits) so this URL stays valid.
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-ecgauth}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-ecgauth}?charset=utf8mb4
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (32+ characters)}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SEED_DEMO: ${SEED_DEMO:-true}
+      DEMO_ECG_DIR: /demo_ecg
+    volumes:
+      # The seed script writes the demo patients' .hea/.dat files here so you can upload them at sign-in.
+      - ./demo_ecg:/demo_ecg
+    # not published: reachable only through the frontend's /api proxy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  mysql_data:
