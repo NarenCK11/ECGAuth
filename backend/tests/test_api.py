@@ -418,3 +418,17 @@ def test_weak_bootstrap_admin_password_is_refused(db, monkeypatch):
     finally:
         monkeypatch.undo()
         config.get_settings.cache_clear()
+
+
+# --- Phase 11 journey --------------------------------------------------------------------------------------
+def test_full_journey_register_enroll_logout_login_portal(client, make_client):
+    info = sign_up(client, "journey", 7, name="Jo Urney")
+    assert client.get("/api/auth/me").status_code == 401            # enrolling does not sign in
+    c = make_client()
+    r = login(c, "journey", 7)
+    assert r.status_code == 200 and r.json()["analysis"]["authentication"]["authenticated"] is True
+    assert c.get("/api/auth/me").json()["user"]["id"] == info["user"]["id"]   # session identity is the UUID
+    assert c.get("/api/medical-records").status_code == 200
+    assert c.post("/api/auth/logout").status_code == 204
+    assert c.get("/api/medical-records").status_code == 401
+    assert login(c, "journey", 7).status_code == 200                # and back in again
