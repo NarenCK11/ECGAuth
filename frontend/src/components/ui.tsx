@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, FileCheck2, FileUp, Info, Moon, Sun, XCircle, Activity } from "lucide-react";
+import { CheckCircle2, FileCheck2, FileUp, Info, Moon, Sun, XCircle, Activity } from "lucide-react";
 
 export function Brand({ to = "/" }: { to?: string }) {
   return (
@@ -36,15 +36,6 @@ export function Loading({ label = "Loading" }: { label?: string }) {
 export function ErrorBanner({ message }: { message: string | null }) {
   if (!message) return null;
   return <div className="banner error" role="alert"><XCircle size={16} /><span>{message}</span></div>;
-}
-
-export function DemoBanner() {
-  return (
-    <div className="banner" role="note">
-      <AlertTriangle size={16} />
-      <span><strong>Demonstration environment.</strong> All patients, records, doctors and reports are fictional sample data. This is not a real medical-record system.</span>
-    </div>
-  );
 }
 
 export function InfoNote({ children }: { children: ReactNode }) {

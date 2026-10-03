@@ -5,7 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useFetch } from "../lib/hooks";
 import { fmtDate, fmtDateTime } from "../lib/format";
 import type { AttemptSummary, Profile, RecordList } from "../lib/types";
-import { DemoBanner, ErrorBanner, Loading, PageHead, ResultBadge } from "../components/ui";
+import { ErrorBanner, Loading, PageHead, ResultBadge } from "../components/ui";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -28,7 +28,6 @@ export default function Dashboard() {
   return (
     <>
       <PageHead title={`Welcome, ${first}`} subtitle="ECGAuth Medical Portal" />
-      <DemoBanner />
       <div className="grid cols-3">
         <div className="card stat"><div className="stat-label">Patient ID</div><div className="stat-value">{user.patient_id}</div><div className="stat-sub mono">{user.id}</div></div>
         <div className="card stat"><div className="stat-label">Authentication</div>

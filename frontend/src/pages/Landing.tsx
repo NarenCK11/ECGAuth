@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, FileHeart, Fingerprint, LineChart, LockKeyhole, ShieldCheck } from "lucide-react";
-import { DemoBanner } from "../components/ui";
 
 const BEAT = "M0,60 L40,60 L52,60 L60,46 L68,60 L84,60 L92,66 L100,10 L108,96 L116,60 L132,60 L150,60 L166,38 L184,60 L220,60";
 
@@ -41,7 +40,6 @@ export default function Landing() {
           <p className="secondary small" style={{ marginTop: 6 }}>Watch your signal move through the pipeline, then enter the medical portal with a short-lived, secure session.</p></div>
       </section>
 
-      <div style={{ maxWidth: 1100, width: "100%" }}><DemoBanner /></div>
       <p className="small muted row" style={{ gap: 6 }}><LockKeyhole size={14} />Sessions use HttpOnly cookies. Uploaded recordings are never stored or exposed through URLs.</p>
     </div>
   );

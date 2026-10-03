@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { useFetch } from "../lib/hooks";
 import { fmtDate } from "../lib/format";
 import type { MedicalRecord, RecordList } from "../lib/types";
-import { DemoBanner, ErrorBanner, Loading, PageHead } from "../components/ui";
+import { ErrorBanner, Loading, PageHead } from "../components/ui";
 
 function Record({ r }: { r: MedicalRecord }) {
   const [open, setOpen] = useState(false);
@@ -40,7 +40,6 @@ export default function MedicalRecords() {
   return (
     <>
       <PageHead title="Medical Records" subtitle="Recent records and attached reports" />
-      <DemoBanner />
       <div className="filters">
         <div className="tabs" role="tablist" aria-label="Record type">
           <button role="tab" className="tab" aria-selected={tab === "all"} onClick={() => setParams({})}>All records</button>
