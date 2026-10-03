@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Bootstrap admin (hashed on first start; never stored in plaintext)
     admin_username: str = ""
     admin_password: str = ""
+    min_admin_password_length: int = 10  # only checked when the admin account is first created
 
     # HTTP
     cors_origins: str = "http://localhost:5173"
