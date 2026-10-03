@@ -28,6 +28,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-test-secret-test-secret-0123456
 os.environ["ADMIN_USERNAME"] = "testadmin"
 os.environ["ADMIN_PASSWORD"] = "testadmin-password-1"
 os.environ["LOGIN_MAX_FAILURES"] = "5"
+os.environ["MIN_ADMIN_PASSWORD_LENGTH"] = "10"  # tests must not inherit a relaxed value from a developer's .env
 if TEST_DB_URL:
     assert re.search(r"/[^/?]*_test(\?|$)", TEST_DB_URL), "TEST_DATABASE_URL must name a *_test database"
     os.environ["DATABASE_URL"] = TEST_DB_URL
